@@ -22,7 +22,8 @@ PlatoBoost:Verify(function(success)
         local Vim = game:GetService("VirtualInputManager")
 
         local recordedActions = {}
-        local recordStartTime = 0
+        local recordStartTime = nil
+        local recordedEndDelay = 0
 
         local trashNames = { "puddle", "random trash", "trash", "clean" }
         local blacklist = { "bench", "press", "curl", "rack", "seat", "weight", "barbell", "dumbbell", "machine", "equipment", "use", "lift", "deadlift", "overhead", "squat" }
@@ -206,19 +207,25 @@ PlatoBoost:Verify(function(success)
 
         UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if not _G.Recording then return end
-            
-            local guiPos = frame.AbsolutePosition
-            local guiSize = frame.AbsoluteSize
-            if input.Position.X >= guiPos.X and input.Position.X <= (guiPos.X + guiSize.X) and
-               input.Position.Y >= guiPos.Y and input.Position.Y <= (guiPos.Y + guiSize.Y) then
-                return
+
+            -- Only check GUI overlap for mouse/touch inputs (keyboard inputs don't have Position)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                local guiPos = frame.AbsolutePosition
+                local guiSize = frame.AbsoluteSize
+                if input.Position and input.Position.X >= guiPos.X and input.Position.X <= (guiPos.X + guiSize.X) and
+                   input.Position.Y >= guiPos.Y and input.Position.Y <= (guiPos.Y + guiSize.Y) then
+                    return
+                end
             end
 
+            if not recordStartTime then return end
             local delayTime = tick() - recordStartTime
-            
+
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                local exactPos = Vector2.new(input.Position.X, input.Position.Y)
-                table.insert(recordedActions, {type = "tap", time = delayTime, pos = exactPos})
+                if input.Position then
+                    local exactPos = Vector2.new(input.Position.X, input.Position.Y)
+                    table.insert(recordedActions, {type = "tap", time = delayTime, pos = exactPos})
+                end
             elseif input.UserInputType == Enum.UserInputType.Keyboard then
                 table.insert(recordedActions, {type = "key", time = delayTime, keyCode = input.KeyCode})
             end
@@ -229,55 +236,46 @@ PlatoBoost:Verify(function(success)
                 local guiOffset = GuiService:GetGuiInset()
                 while _G.MacroPlaying do
                     if #recordedActions > 0 then
-                        local lastTime = 0
+                        -- execute using stored delays
                         for index, act in ipairs(recordedActions) do
                             if not _G.MacroPlaying then break end
 
-                            local waitTime = act.time - lastTime
-                            if waitTime > 0 then 
-                                local slept = 0
-                                while slept < waitTime and _G.MacroPlaying do
-                                    statusLabel.Text = "Status: Waiting (" .. string.format("%.1f", waitTime - slept) .. "s)"
-                                    task.wait(0.1)
-                                    slept = slept + 0.1
-                                end
+                            local waitTime = act.delay or 0
+                            if waitTime > 0 then
+                                statusLabel.Text = "Status: Waiting (" .. string.format("%.2f", waitTime) .. "s)"
+                                task.wait(waitTime)
                             end
-                            lastTime = act.time
-                            
+
+                            if not _G.MacroPlaying then break end
+
                             statusLabel.Text = "Status: Executing " .. index .. "/" .. #recordedActions
                             if act.type == "tap" and act.pos then
                                 local clickX = act.pos.X
                                 local clickY = act.pos.Y + guiOffset.Y
-                                
+
                                 Vim:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
                                 task.wait(0.05)
                                 Vim:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
-                            elseif act.type == "key" then
+                            elseif act.type == "key" and act.keyCode then
                                 Vim:SendKeyEvent(true, act.keyCode, false, game)
                                 task.wait(0.05)
                                 Vim:SendKeyEvent(false, act.keyCode, false, game)
                             end
                         end
 
-                        if _G.MacroPlaying and recordedActions[#recordedActions] then
-                            local totalRecordTime = tick() - recordStartTime
-                            local remainingEndWait = totalRecordTime - recordedActions[#recordedActions].time
-                            if remainingEndWait > 0 then
-                                local slept = 0
-                                while slept < remainingEndWait and _G.MacroPlaying do
-                                    statusLabel.Text = "Status: Cycle Resting (" .. string.format("%.1f", remainingEndWait - slept) .. "s)"
-                                    task.wait(0.1)
-                                    slept = slept + 0.1
-                                end
-                            end
+                        -- wait the recorded end delay (time between last action and stop)
+                        if _G.MacroPlaying and recordedEndDelay and recordedEndDelay > 0 then
+                            statusLabel.Text = "Status: Cycle Resting (" .. string.format("%.2f", recordedEndDelay) .. "s)"
+                            task.wait(recordedEndDelay)
                         end
                     else
+                        -- fallback behavior if no recorded actions
                         clickGameButton("use")
                         task.wait(0.3)
                         clickGameButton("rep")
                         task.wait(0.2)
                     end
-                    
+
                     task.wait(0.1)
                 end
                 isRunning = false
@@ -430,6 +428,7 @@ PlatoBoost:Verify(function(success)
                 _G.MacroPlaying = false
                 recordedActions = {}
                 recordStartTime = tick()
+                recordedEndDelay = 0
                 _G.Recording = true
                 recButton.Text = "REC 🔴"
                 statusLabel.Text = "Status: Recording..."
@@ -440,6 +439,50 @@ PlatoBoost:Verify(function(success)
             if _G.Recording then
                 _G.Recording = false
                 recButton.Text = "REC"
+
+                -- if last action is accidental UI click inside the GUI, remove it
                 if #recordedActions > 0 then
                     table.remove(recordedActions, #recordedActions)
-              
+                end
+
+                -- compute delays between actions and store as act.delay
+                local prevTime = 0
+                for i, act in ipairs(recordedActions) do
+                    local t = act.time or 0
+                    local delta = t - prevTime
+                    if delta < 0 then delta = 0 end
+                    act.delay = delta
+                    prevTime = t
+                end
+
+                -- compute the delay between last action and pressing Stop (end delay)
+                if recordStartTime then
+                    local totalRecTime = tick() - recordStartTime
+                    local lastActionTime = (recordedActions[#recordedActions] and recordedActions[#recordedActions].time) or 0
+                    recordedEndDelay = math.max(0, totalRecTime - lastActionTime)
+                else
+                    recordedEndDelay = 0
+                end
+
+                -- clear recordStartTime so future recordings start fresh
+                recordStartTime = nil
+
+                statusLabel.Text = "Status: Idle"
+            end
+        end)
+
+        bindButton(cleanButton, function()
+            if not _G.AutoCleaning and not _G.Recording and not isRunning then
+                _G.AutoCleaning = true
+                startAutoCleaning()
+                statusLabel.Text = "Status: AutoCleaning"
+            end
+        end)
+
+        bindButton(stopCleanButton, function()
+            _G.AutoCleaning = false
+            isCleaning = false
+            statusLabel.Text = "Status: Idle"
+        end)
+    end
+end)
