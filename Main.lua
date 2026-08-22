@@ -1,6 +1,5 @@
 local PlatoBoost = loadstring(game:HttpGet("https://dash.platoboost.app/api/sdk/29792"))()
 
--- Wrap the original macro UI / logic into a function that starts only after verification
 local function startScript()
     _G.MacroPlaying = false
     _G.Recording = false
@@ -202,7 +201,6 @@ local function startScript()
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if not _G.Recording then return end
 
-        -- Only check GUI overlap for mouse/touch inputs (keyboard inputs don't have Position)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local guiPos = frame.AbsolutePosition
             local guiSize = frame.AbsoluteSize
@@ -230,7 +228,6 @@ local function startScript()
             local guiOffset = GuiService:GetGuiInset()
             while _G.MacroPlaying do
                 if #recordedActions > 0 then
-                    -- execute using stored delays
                     for index, act in ipairs(recordedActions) do
                         if not _G.MacroPlaying then break end
 
@@ -257,13 +254,11 @@ local function startScript()
                         end
                     end
 
-                    -- wait the recorded end delay (time between last action and stop)
                     if _G.MacroPlaying and recordedEndDelay and recordedEndDelay > 0 then
                         statusLabel.Text = "Status: Cycle Resting (" .. string.format("%.2f", recordedEndDelay) .. "s)"
                         task.wait(recordedEndDelay)
                     end
                 else
-                    -- fallback behavior if no recorded actions
                     clickGameButton("use")
                     task.wait(0.3)
                     clickGameButton("rep")
@@ -434,12 +429,10 @@ local function startScript()
             _G.Recording = false
             recButton.Text = "REC"
 
-            -- if last action is accidental UI click inside the GUI, remove it
             if #recordedActions > 0 then
                 table.remove(recordedActions, #recordedActions)
             end
 
-            -- compute delays between actions and store as act.delay
             local prevTime = 0
             for i, act in ipairs(recordedActions) do
                 local t = act.time or 0
@@ -449,7 +442,6 @@ local function startScript()
                 prevTime = t
             end
 
-            -- compute the delay between last action and pressing Stop (end delay)
             if recordStartTime then
                 local totalRecTime = tick() - recordStartTime
                 local lastActionTime = (recordedActions[#recordedActions] and recordedActions[#recordedActions].time) or 0
@@ -458,7 +450,6 @@ local function startScript()
                 recordedEndDelay = 0
             end
 
-            -- clear recordStartTime so future recordings start fresh
             recordStartTime = nil
 
             statusLabel.Text = "Status: Idle"
@@ -480,11 +471,9 @@ local function startScript()
     end)
 end
 
--- Create a simple UI to input/submit a key for PlatoBoost verification
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- If the script UI already exists (from a previous run), remove it to avoid duplicates
 if playerGui:FindFirstChild("PlatoKeyGui") then
     playerGui.PlatoKeyGui:Destroy()
 end
@@ -562,13 +551,10 @@ local function attemptVerify(key)
         end
     end
 
-    -- Try calling Verify with a key argument first (SDKs vary)
     local ok = pcall(function()
         if PlatoBoost and type(PlatoBoost.Verify) == "function" then
-            -- try common signature: PlatoBoost:Verify(key, callback) or PlatoBoost.Verify(PlatoBoost, key, callback)
             local status, res = pcall(function() PlatoBoost:Verify(key, cb) end)
             if not status then
-                -- try different call style
                 PlatoBoost.Verify(PlatoBoost, key, cb)
             end
         else
@@ -577,7 +563,6 @@ local function attemptVerify(key)
     end)
 
     if not ok then
-        -- Fallback: try calling Verify without key (some SDKs open their own UI)
         local ok2 = pcall(function()
             if PlatoBoost and type(PlatoBoost.Verify) == "function" then
                 PlatoBoost:Verify(cb)
@@ -597,8 +582,6 @@ submit.Activated:Connect(function()
 end)
 
 sdkBtn.Activated:Connect(function()
-    attemptVerify("") -- try SDK default verify
+    attemptVerify("")
 end)
 
--- Note: If you want automatic verification without user input, uncomment the following line:
--- attemptVerify("")
