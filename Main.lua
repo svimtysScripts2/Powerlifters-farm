@@ -1,4 +1,4 @@
-
+local PlatoBoost = loadstring(game:HttpGet("https://dash.platoboost.app/api/sdk/29792"))()
 
 local function startScript()
     _G.MacroPlaying = false
@@ -471,5 +471,8 @@ local function startScript()
     end)
 end
 
-
-
+if PlatoBoost.ValidateKey() then
+    startScript()
+else
+    PlatoBoost.PromptKey()
+end
