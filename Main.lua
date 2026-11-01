@@ -119,17 +119,11 @@ local function makeGui()
     status.TextXAlignment = Enum.TextXAlignment.Left
     state.status = status
 
-    local layout = Instance.new("UIListLayout")
-    layout.Parent = main
-    layout.Padding = UDim.new(0, 8)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    local function addButton(text, yPos)
+    local function addButton(text, xPos, yPos, sizeX)
         local btn = Instance.new("TextButton")
         btn.Parent = main
-        btn.Size = UDim2.new(1, -20, 0, 40)
-        btn.Position = UDim2.new(0, 10, 0, yPos)
+        btn.Size = UDim2.new(sizeX, -10, 0, 40)
+        btn.Position = UDim2.new(0, xPos, 0, yPos)
         btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         btn.BorderSizePixel = 0
         btn.Text = text
@@ -142,18 +136,17 @@ local function makeGui()
     end
 
     local buttons = {}
-    buttons.record = addButton("REC", 50)
-    buttons.stopRecord = addButton("STOP REC", 50)
-    buttons.play = addButton("PLAY", 98)
-    buttons.stopPlay = addButton("STOP", 98)
-    buttons.teleportTrash = addButton("TP TRASH", 146)
-    buttons.teleportPuddle = addButton("TP PUDDLE", 146)
-    buttons.clean = addButton("AUTO CLEAN", 194)
-    buttons.stopClean = addButton("STOP CLEAN", 194)
+    buttons.record = addButton("REC", 10, 50, 0.5)
+    buttons.stopRecord = addButton("STOP REC", 135, 50, 0.5)
+    buttons.play = addButton("PLAY", 10, 98, 0.5)
+    buttons.stopPlay = addButton("STOP", 135, 98, 0.5)
+    buttons.teleportTrash = addButton("TP TRASH", 10, 146, 0.5)
+    buttons.teleportPuddle = addButton("TP PUDDLE", 135, 146, 0.5)
+    buttons.clean = addButton("AUTO CLEAN", 10, 194, 0.5)
+    buttons.stopClean = addButton("STOP CLEAN", 135, 194, 0.5)
 
     local drag = false
     local dragStart, startPos
-    local inputConn
 
     main.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -204,11 +197,13 @@ local function getTargetPart(target)
 end
 
 local function clickOnScreenPosition(x, y)
-    local guiOffset = GuiService:GetGuiInset()
-    local realY = y + guiOffset.Y
-    Vim:SendMouseButtonEvent(x, realY, 0, true, game, 0)
+    local inset = GuiService:GetGuiInset()
+    local screenX = math.clamp(x, 0, 5000)
+    local screenY = math.clamp(y + inset.Y, 0, 5000)
+
+    Vim:SendMouseButtonEvent(screenX, screenY, 0, true, game, 0)
     task.wait(0.04)
-    Vim:SendMouseButtonEvent(x, realY, 0, false, game, 0)
+    Vim:SendMouseButtonEvent(screenX, screenY, 0, false, game, 0)
 end
 
 local function clickObjectByName(nameFragment)
@@ -302,10 +297,10 @@ end
 local function playMacro()
     if state.macroPlaying then return end
     state.macroPlaying = true
+    state.running = true
     setStatus("Playing Macro")
 
     task.spawn(function()
-        local guiOffset = GuiService:GetGuiInset()
         while state.macroPlaying do
             if #state.recordedActions > 0 then
                 for idx, act in ipairs(state.recordedActions) do
@@ -360,8 +355,12 @@ local function stopRecording()
     if not state.recording then return end
 
     state.recording = false
+
     if #state.recordedActions > 0 then
-        table.remove(state.recordedActions)
+        local lastAction = state.recordedActions[#state.recordedActions]
+        if lastAction and lastAction.type == "tap" then
+            table.remove(state.recordedActions)
+        end
     end
 
     local prevTime = 0
@@ -536,6 +535,7 @@ buildUI()
 setStatus("Ready")
 
 print("Powerlifters Farm script loaded")
+print("Fix: recorded taps are now replayed with screen-space click events")
 print("Add exact names to config.trashNames / config.puddleNames if needed")
 print("Example: config.trashNames = { 'trash', 'random trash', 'waste' }")
 print("Example: config.puddleNames = { 'puddle', 'mud', 'water' }")
