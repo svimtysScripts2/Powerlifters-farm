@@ -4,53 +4,108 @@ local playerGui = player:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
-if playerGui:FindFirstChild("PhoneMacroGui") then
-    playerGui.PhoneMacroGui:Destroy()
-end
+pcall(function()
+    if playerGui:FindFirstChild("vimtysscriptsGui") then
+        playerGui.vimtysscriptsGui:Destroy()
+    end
+end)
 
 local screenGui = Instance.new("ScreenGui", playerGui)
-screenGui.Name = "PhoneMacroGui"
+screenGui.Name = "vimtysscriptsGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 220, 0, 210)
+frame.Size = UDim2.new(0, 230, 0, 225)
 frame.Position = UDim2.new(0.05, 0, 0.3, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.Active = true
 frame.Draggable = true
-
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
-local function createButton(name, text, yPos, color)
+-- Верхня панель (Заголовок)
+local topBar = Instance.new("Frame", frame)
+topBar.Size = UDim2.new(0, 210, 0, 30)
+topBar.Position = UDim2.new(0, 10, 0, 8)
+topBar.BackgroundTransparency = 1
+
+-- Чорний прямокутник для імені vimtysscripts
+local nameBg = Instance.new("Frame", topBar)
+nameBg.Size = UDim2.new(0, 160, 0, 30)
+nameBg.Position = UDim2.new(0, 0, 0, 0)
+nameBg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Instance.new("UICorner", nameBg).CornerRadius = UDim.new(0, 6)
+
+local nameLbl = Instance.new("TextLabel", nameBg)
+nameLbl.Size = UDim2.new(1, 0, 1, 0)
+nameLbl.BackgroundTransparency = 1
+nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameLbl.TextSize = 13
+nameLbl.Font = Enum.Font.GothamBold
+nameLbl.Text = "vimtysscripts"
+
+-- Червоний круг зі знаком сонця у кінці заголовка
+local sunBtn = Instance.new("TextButton", topBar)
+sunBtn.Size = UDim2.new(0, 30, 0, 30)
+sunBtn.Position = UDim2.new(1, -30, 0, 0)
+sunBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+sunBtn.Text = "卍"
+sunBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+sunBtn.TextSize = 16
+sunBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", sunBtn).CornerRadius = UDim.new(1, 0) -- Робимо круглим
+
+-- Кнопки керування макросом
+local function createButton(text, yPos, color)
     local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0, 200, 0, 35)
+    btn.Size = UDim2.new(0, 210, 0, 32)
     btn.Position = UDim2.new(0, 10, 0, yPos)
     btn.BackgroundColor3 = color
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
+    btn.TextSize = 13
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     return btn
 end
 
-local recBtn = createButton("Rec", "REC: OFF", 15, Color3.fromRGB(60, 60, 60))
-local stopBtn = createButton("Stop", "STOP", 55, Color3.fromRGB(120, 40, 40))
-local playBtn = createButton("Play", "START (1x)", 95, Color3.fromRGB(40, 100, 40))
-local loopBtn = createButton("Loop", "START LOOP (∞)", 135, Color3.fromRGB(40, 60, 120))
+local recBtn = createButton("REC: OFF", 46, Color3.fromRGB(60, 60, 60))
+local stopBtn = createButton("STOP", 84, Color3.fromRGB(120, 40, 40))
+local playBtn = createButton("START (1x)", 122, Color3.fromRGB(40, 100, 40))
+local loopBtn = createButton("START LOOP (∞)", 160, Color3.fromRGB(120, 80, 40))
 
 local statusLbl = Instance.new("TextLabel", frame)
-statusLbl.Size = UDim2.new(0, 200, 0, 20)
-statusLbl.Position = UDim2.new(0, 10, 0, 175)
+statusLbl.Size = UDim2.new(0, 210, 0, 20)
+statusLbl.Position = UDim2.new(0, 10, 0, 200)
 statusLbl.BackgroundTransparency = 1
 statusLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
-statusLbl.TextSize = 12
+statusLbl.TextSize = 11
 statusLbl.Font = Enum.Font.Gotham
 statusLbl.Text = "Status: Ready"
 
+-- Логіка згортання/розгортання при натисканні на червоний круг з сонцем
+local isMinimized = false
+sunBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        frame.Size = UDim2.new(0, 230, 0, 46)
+        recBtn.Visible = false
+        stopBtn.Visible = false
+        playBtn.Visible = false
+        loopBtn.Visible = false
+        statusLbl.Visible = false
+    else
+        frame.Size = UDim2.new(0, 230, 0, 225)
+        recBtn.Visible = true
+        stopBtn.Visible = true
+        playBtn.Visible = true
+        loopBtn.Visible = true
+        statusLbl.Visible = true
+    end
+end)
+
 local recordedActions = {}
-local totalDuration = 0 -- Загальна тривалість запису до моменту натискання STOP
+local totalDuration = 0
 local isRecording = false
 local isPlaying = false
 local recordingStartTime = 0
@@ -66,27 +121,24 @@ recBtn.MouseButton1Click:Connect(function()
     statusLbl.Text = "Recording timeline..."
 end)
 
--- Зупинка запису: фіксуємо точний час, коли ти натиснув STOP
+-- Зупинка запису та фіксація загального часу
 stopBtn.MouseButton1Click:Connect(function()
     if isRecording then
         isRecording = false
         recBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         recBtn.Text = "REC: OFF"
         
-        -- Рахуємо загальний час від старту до моменту натискання STOP
         totalDuration = tick() - recordingStartTime
-        
         statusLbl.Text = "Saved! Len: " .. string.format("%.2fs", totalDuration)
     end
     isPlaying = false
 end)
 
--- Запис дотиків із точним часом від початку
+-- Запис дотиків
 UserInputService.InputBegan:Connect(function(input, gpe)
     if isRecording and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
         local pos = input.Position
         
-        -- Ігноруємо кліки по самому меню макросу
         local absPos = frame.AbsolutePosition
         local absSize = frame.AbsoluteSize
         if not (pos.X >= absPos.X and pos.X <= absPos.X + absSize.X and pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y) then
@@ -103,7 +155,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
--- Відтворення з урахуванням повного часу сесії до STOP
+-- Відтворення макросу
 local function playback(loop)
     if isPlaying or #recordedActions == 0 then return end
     isPlaying = true
@@ -112,7 +164,6 @@ local function playback(loop)
         repeat
             local playStartTime = tick()
             
-            -- Відтворюємо всі кліки за їхнім таймлайном
             for _, action in ipairs(recordedActions) do
                 if not isPlaying then break end
                 
@@ -126,7 +177,6 @@ local function playback(loop)
 
                 statusLbl.Text = "Playing: " .. string.format("%.2fs", action.timeFromStart)
                 
-                -- Симуляція кліку по елементу інтерфейсу під цими координатами
                 pcall(function()
                     for _, guiObj in ipairs(playerGui:GetDescendants()) do
                         if guiObj:IsA("GuiButton") and guiObj.Visible then
@@ -145,7 +195,6 @@ local function playback(loop)
                 end)
             end
             
-            -- Витримуємо паузу від останнього кліку до моменту, коли ти натиснув STOP
             if isPlaying and totalDuration > 0 then
                 local stopTargetTime = playStartTime + totalDuration
                 while tick() < stopTargetTime do
