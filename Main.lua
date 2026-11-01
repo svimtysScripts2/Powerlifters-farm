@@ -1,478 +1,541 @@
-local PlatoBoost = loadstring(game:HttpGet("https://dash.platoboost.app/api/sdk/29792"))()
+local player = game:GetService("Players").LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
+local Vim = game:GetService("VirtualInputManager")
+local workspace = game:GetService("Workspace")
 
-local function startScript()
-    _G.MacroPlaying = false
-    _G.Recording = false
-    _G.AutoCleaning = false
+local state = {
+    recording = false,
+    macroPlaying = false,
+    autoCleaning = false,
+    cleaning = false,
+    running = false,
+    recordedActions = {},
+    recordStart = nil,
+    endDelay = 0,
+    lastGUI = nil,
+}
 
-    local isRunning = false
-    local isCleaning = false
+local config = {
+    puddleNames = {
+        "puddle",
+        "water",
+        "mud",
+        "pool",
+    },
+    trashNames = {
+        "trash",
+        "random trash",
+        "garbage",
+        "waste",
+        "clean",
+        "junk",
+    },
+    blacklist = {
+        "bench",
+        "press",
+        "curl",
+        "rack",
+        "seat",
+        "weight",
+        "barbell",
+        "dumbbell",
+        "machine",
+        "equipment",
+        "use",
+        "lift",
+        "deadlift",
+        "overhead",
+        "squat",
+        "rep",
+    },
+}
 
-    local player = game.Players.LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
-    local UserInputService = game:GetService("UserInputService")
-    local GuiService = game:GetService("GuiService")
-    local Vim = game:GetService("VirtualInputManager")
+local function clampText(text)
+    return text and tostring(text) or ""
+end
 
-    local recordedActions = {}
-    local recordStartTime = nil
-    local recordedEndDelay = 0
+local function toLower(str)
+    return string.lower(clampText(str))
+end
 
-    local trashNames = { "puddle", "random trash", "trash", "clean" }
-    local blacklist = { "bench", "press", "curl", "rack", "seat", "weight", "barbell", "dumbbell", "machine", "equipment", "use", "lift", "deadlift", "overhead", "squat" }
+local function isBlacklisted(str)
+    local s = toLower(str)
+    for _, word in ipairs(config.blacklist) do
+        if s:find(word, 1, true) then
+            return true
+        end
+    end
+    return false
+end
 
-    if playerGui:FindFirstChild("PowerLiftersGui") then 
-        playerGui.PowerLiftersGui:Destroy() 
+local function makeGui()
+    if playerGui:FindFirstChild("PowerliftersFarmGui") then
+        playerGui.PowerliftersFarmGui:Destroy()
     end
 
-    local screenGui = Instance.new("ScreenGui", playerGui)
-    screenGui.Name = "PowerLiftersGui"
-    screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    local ui = Instance.new("ScreenGui")
+    ui.Name = "PowerliftersFarmGui"
+    ui.ResetOnSpawn = false
+    ui.IgnoreGuiInset = true
+    ui.Parent = playerGui
 
-    local frame = Instance.new("Frame", screenGui)
-    frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, 260, 0, 260)
-    frame.Position = UDim2.new(0.5, -130, 0.15, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    frame.BorderSizePixel = 0
-    frame.Active = true
-    frame.ClipsDescendants = true
-    frame.ZIndex = 1
+    local main = Instance.new("Frame")
+    main.Name = "MainFrame"
+    main.Parent = ui
+    main.Size = UDim2.new(0, 270, 0, 300)
+    main.Position = UDim2.new(0.5, -135, 0.12, 0)
+    main.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    main.BorderSizePixel = 0
+    main.Active = true
+    main.ClipsDescendants = true
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
 
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-    local frameStroke = Instance.new("UIStroke", frame)
-    frameStroke.Thickness = 2
+    local stroke = Instance.new("UIStroke", main)
+    stroke.Thickness = 2
+    stroke.Color = Color3.fromRGB(255, 90, 90)
 
-    local titleBar = Instance.new("Frame", frame)
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    titleBar.BorderSizePixel = 0
-    titleBar.Active = true
-    titleBar.ZIndex = 2
+    local title = Instance.new("TextLabel")
+    title.Parent = main
+    title.Size = UDim2.new(1, -20, 0, 36)
+    title.Position = UDim2.new(0, 10, 0, 8)
+    title.BackgroundTransparency = 1
+    title.Text = "Powerlifters Farm"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 18
+    title.TextXAlignment = Enum.TextXAlignment.Left
 
-    local toggleBtn = Instance.new("TextButton", titleBar)
-    toggleBtn.Size = UDim2.new(0, 40, 1, 0)
-    toggleBtn.BackgroundTransparency = 1
-    toggleBtn.Text = "[#]"
-    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleBtn.Font = Enum.Font.SourceSansBold
-    toggleBtn.TextSize = 18
-    toggleBtn.ZIndex = 10
+    local status = Instance.new("TextLabel")
+    status.Parent = main
+    status.Size = UDim2.new(1, -20, 0, 26)
+    status.Position = UDim2.new(0, 10, 0, 266)
+    status.BackgroundTransparency = 1
+    status.Text = "Status: Idle"
+    status.TextColor3 = Color3.fromRGB(230, 230, 230)
+    status.Font = Enum.Font.SourceSans
+    status.TextSize = 13
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    state.status = status
 
-    local titleLabel = Instance.new("TextLabel", titleBar)
-    titleLabel.Position = UDim2.new(0, 45, 0, 0)
-    titleLabel.Size = UDim2.new(1, -50, 1, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "svimtysScripts"
-    titleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextSize = 16
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.ZIndex = 3
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = main
+    layout.Padding = UDim.new(0, 8)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    local btnContainer = Instance.new("Frame", frame)
-    btnContainer.Position = UDim2.new(0, 0, 0, 40)
-    btnContainer.Size = UDim2.new(1, 0, 0, 175)
-    btnContainer.BackgroundTransparency = 1
-    btnContainer.ZIndex = 3
-
-    local statusLabel = Instance.new("TextLabel", frame)
-    statusLabel.Position = UDim2.new(0, 10, 0, 215)
-    statusLabel.Size = UDim2.new(1, -20, 0, 35)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "Status: Idle"
-    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    statusLabel.Font = Enum.Font.SourceSans
-    statusLabel.TextSize = 14
-    statusLabel.ZIndex = 3
-
-    toggleBtn.Activated:Connect(function()
-        btnContainer.Visible = not btnContainer.Visible
-        statusLabel.Visible = not statusLabel.Visible
-        if btnContainer.Visible then 
-            frame.Size = UDim2.new(0, 260, 0, 260)
-        else 
-            frame.Size = UDim2.new(0, 260, 0, 40) 
-        end
-    end)
-
-    local function createBtn(text, pos, size)
-        local btn = Instance.new("TextButton", btnContainer)
-        btn.Size = size or UDim2.new(0, 115, 0, 45)
-        btn.Position = pos
-        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    local function addButton(text, yPos)
+        local btn = Instance.new("TextButton")
+        btn.Parent = main
+        btn.Size = UDim2.new(1, -20, 0, 40)
+        btn.Position = UDim2.new(0, 10, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        btn.BorderSizePixel = 0
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.SourceSansBold
         btn.TextSize = 15
-        btn.ZIndex = 10
-        
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-        local stroke = Instance.new("UIStroke", btn)
-        stroke.Thickness = 2
-        return btn, stroke
+        btn.AutoButtonColor = false
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        return btn
     end
 
-    local startButton, startStroke = createBtn("START", UDim2.new(0, 10, 0, 10))
-    local stopButton, stopStroke = createBtn("STOP", UDim2.new(0, 135, 0, 10))
-    local recButton, recStroke = createBtn("REC", UDim2.new(0, 10, 0, 65))
-    local stopRecButton, stopRecStroke = createBtn("STOP REC", UDim2.new(0, 135, 0, 65))
-    local cleanButton, cleanStroke = createBtn("AUTO CLEAN", UDim2.new(0, 10, 0, 120))
-    local stopCleanButton, stopCleanStroke = createBtn("STOP CLEAN", UDim2.new(0, 135, 0, 120))
+    local buttons = {}
+    buttons.record = addButton("REC", 50)
+    buttons.stopRecord = addButton("STOP REC", 50)
+    buttons.play = addButton("PLAY", 98)
+    buttons.stopPlay = addButton("STOP", 98)
+    buttons.teleportTrash = addButton("TP TRASH", 146)
+    buttons.teleportPuddle = addButton("TP PUDDLE", 146)
+    buttons.clean = addButton("AUTO CLEAN", 194)
+    buttons.stopClean = addButton("STOP CLEAN", 194)
 
-    local dragging = false
+    local drag = false
     local dragStart, startPos
+    local inputConn
 
-    titleBar.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            dragging = true
+    main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            drag = true
             dragStart = input.Position
-            startPos = frame.Position
-            
-            local connChanged, connEnded
-            connChanged = UserInputService.InputChanged:Connect(function(moveInput)
-                if dragging and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
-                    local delta = moveInput.Position - dragStart
-                    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            startPos = main.Position
+
+            local movedConn
+            local endedConn
+
+            movedConn = UserInputService.InputChanged:Connect(function(move)
+                if drag and (move.UserInputType == Enum.UserInputType.MouseMovement or move.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = move.Position - dragStart
+                    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
                 end
             end)
-            
-            connEnded = UserInputService.InputEnded:Connect(function(endInput)
+
+            endedConn = UserInputService.InputEnded:Connect(function(endInput)
                 if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
-                    dragging = false
-                    if connChanged then connChanged:Disconnect() end
-                    if connEnded then connEnded:Disconnect() end
+                    drag = false
+                    if movedConn then movedConn:Disconnect() end
+                    if endedConn then endedConn:Disconnect() end
                 end
             end)
         end
     end)
 
-    task.spawn(function()
-        local hue = 0
-        while screenGui and screenGui.Parent do
-            hue = (hue + 0.005) % 1
-            local rgbColor = Color3.fromHSV(hue, 0.8, 1)
-            frameStroke.Color = rgbColor
-            toggleBtn.TextColor3 = rgbColor
-            titleLabel.TextColor3 = rgbColor
-            startStroke.Color = rgbColor
-            stopStroke.Color = rgbColor
-            recStroke.Color = rgbColor
-            stopRecStroke.Color = rgbColor
-            cleanStroke.Color = rgbColor
-            stopCleanStroke.Color = rgbColor
-            startButton.TextColor3 = rgbColor
-            stopButton.TextColor3 = rgbColor
-            recButton.TextColor3 = rgbColor
-            stopRecButton.TextColor3 = rgbColor
-            cleanButton.TextColor3 = rgbColor
-            stopCleanButton.TextColor3 = rgbColor
-            task.wait(0.03)
-        end
-    end)
+    return ui, main, status, buttons
+end
 
-    local function clickGameButton(btnName)
-        local guiOffset = GuiService:GetGuiInset()
-        for _, gui in pairs(playerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Name ~= "PowerLiftersGui" and gui.Enabled then
-                for _, obj in pairs(gui:GetDescendants()) do
-                    if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
-                        local name = string.lower(obj.Name)
-                        local text = obj:IsA("TextButton") and string.lower(obj.Text) or ""
-                        if name:find(btnName) or text:find(btnName) then
-                            local absPos = obj.AbsolutePosition
-                            local absSize = obj.AbsoluteSize
-                            local center = Vector2.new(absPos.X + absSize.X / 2, absPos.Y + absSize.Y / 2 + guiOffset.Y)
-                            
-                            Vim:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 0)
-                            task.wait(0.05)
-                            Vim:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 0)
-                            return true
+local function setStatus(text)
+    if state.status then
+        state.status.Text = "Status: " .. text
+    end
+end
+
+local function getRoot()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+end
+
+local function getTargetPart(target)
+    if not target then return nil end
+    if target:IsA("BasePart") then return target end
+    if target:IsA("Model") and target.PrimaryPart then return target.PrimaryPart end
+    return target:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function clickOnScreenPosition(x, y)
+    local guiOffset = GuiService:GetGuiInset()
+    local realY = y + guiOffset.Y
+    Vim:SendMouseButtonEvent(x, realY, 0, true, game, 0)
+    task.wait(0.04)
+    Vim:SendMouseButtonEvent(x, realY, 0, false, game, 0)
+end
+
+local function clickObjectByName(nameFragment)
+    local lowerName = toLower(nameFragment)
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "PowerliftersFarmGui" then
+            for _, obj in ipairs(gui:GetDescendants()) do
+                if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
+                    local text = toLower(obj.Text)
+                    local objName = toLower(obj.Name)
+                    if objName:find(lowerName, 1, true) or text:find(lowerName, 1, true) then
+                        local pos = obj.AbsolutePosition
+                        local size = obj.AbsoluteSize
+                        local x = pos.X + size.X / 2
+                        local y = pos.Y + size.Y / 2
+                        clickOnScreenPosition(x, y)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function findNearestByTerms(terms, maxDistance)
+    local root = getRoot()
+    if not root then return nil end
+
+    local nearest = nil
+    local best = maxDistance or 300
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        local name = obj.Name
+        if (obj:IsA("BasePart") or obj:IsA("Model")) and not isBlacklisted(name) then
+            local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if prompt then
+                local actionText = toLower(prompt.ActionText)
+                local objectText = toLower(prompt.ObjectText)
+                local text = actionText .. " " .. objectText .. " " .. toLower(name)
+                local matched = false
+
+                for _, term in ipairs(terms) do
+                    local lowerTerm = toLower(term)
+                    if text:find(lowerTerm, 1, true) then
+                        matched = true
+                        break
+                    end
+                end
+
+                if matched then
+                    local part = getTargetPart(obj)
+                    if part then
+                        local dist = (root.Position - part.Position).Magnitude
+                        if dist < best then
+                            best = dist
+                            nearest = obj
                         end
                     end
                 end
             end
         end
-        return false
     end
 
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if not _G.Recording then return end
+    return nearest
+end
+
+local function teleportTo(target)
+    local root = getRoot()
+    if not root or not target then return false end
+
+    local part = getTargetPart(target)
+    if not part then return false end
+
+    root.CFrame = CFrame.new(part.Position + Vector3.new(0, 4, 0))
+    return true
+end
+
+local function setPositionFromRecordedAction(act)
+    if act.type == "tap" and act.pos then
+        local x = act.pos.X
+        local y = act.pos.Y
+        clickOnScreenPosition(x, y)
+    elseif act.type == "key" and act.keyCode then
+        Vim:SendKeyEvent(true, act.keyCode, false, game)
+        task.wait(0.05)
+        Vim:SendKeyEvent(false, act.keyCode, false, game)
+    end
+end
+
+local function playMacro()
+    if state.macroPlaying then return end
+    state.macroPlaying = true
+    setStatus("Playing Macro")
+
+    task.spawn(function()
+        local guiOffset = GuiService:GetGuiInset()
+        while state.macroPlaying do
+            if #state.recordedActions > 0 then
+                for idx, act in ipairs(state.recordedActions) do
+                    if not state.macroPlaying then break end
+
+                    local waitTime = tonumber(act.delay) or 0
+                    if waitTime > 0 then
+                        setStatus(string.format("Waiting %.2fs", waitTime))
+                        task.wait(waitTime)
+                    end
+
+                    if not state.macroPlaying then break end
+
+                    setStatus("Executing " .. idx .. "/" .. #state.recordedActions)
+                    setPositionFromRecordedAction(act)
+                end
+
+                if state.macroPlaying and state.endDelay > 0 then
+                    setStatus(string.format("Cycle Rest %.2fs", state.endDelay))
+                    task.wait(state.endDelay)
+                end
+            else
+                setStatus("No macro")
+                task.wait(0.2)
+            end
+
+            task.wait(0.05)
+        end
+
+        state.running = false
+        setStatus("Idle")
+    end)
+end
+
+local function stopMacro()
+    state.macroPlaying = false
+    state.running = false
+    setStatus("Idle")
+end
+
+local function beginRecording()
+    if state.recording or state.autoCleaning or state.running then return end
+
+    state.recordedActions = {}
+    state.recordStart = tick()
+    state.endDelay = 0
+    state.recording = true
+    setStatus("Recording")
+end
+
+local function stopRecording()
+    if not state.recording then return end
+
+    state.recording = false
+    if #state.recordedActions > 0 then
+        table.remove(state.recordedActions)
+    end
+
+    local prevTime = 0
+    for _, act in ipairs(state.recordedActions) do
+        local t = tonumber(act.time) or 0
+        local delta = t - prevTime
+        if delta < 0 then delta = 0 end
+        act.delay = delta
+        prevTime = t
+    end
+
+    local totalRecTime = state.recordStart and (tick() - state.recordStart) or 0
+    local lastActionTime = (state.recordedActions[#state.recordedActions] and state.recordedActions[#state.recordedActions].time) or 0
+    state.endDelay = math.max(0, totalRecTime - lastActionTime)
+    state.recordStart = nil
+
+    setStatus("Idle")
+end
+
+local function triggerPrompt(target)
+    if not target then return end
+    local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if not prompt then return end
+
+    if fireproximityprompt then
+        fireproximityprompt(prompt)
+    else
+        local key = prompt.KeyboardKeyCode or Enum.KeyCode.E
+        Vim:SendKeyEvent(true, key, false, game)
+        task.wait(0.05)
+        Vim:SendKeyEvent(false, key, false, game)
+    end
+end
+
+local function cleanNearestByTerms(terms)
+    if state.autoCleaning then return end
+    state.autoCleaning = true
+    state.cleaning = false
+
+    task.spawn(function()
+        while state.autoCleaning do
+            if not state.cleaning then
+                local target = findNearestByTerms(terms, 220)
+                if target then
+                    state.cleaning = true
+                    setStatus("Walking to target")
+
+                    local root = getRoot()
+                    local part = getTargetPart(target)
+                    if root and part then
+                        root.CFrame = CFrame.new(part.Position + Vector3.new(0, 4, 0))
+                    end
+
+                    local retries = 0
+                    while state.autoCleaning and retries < 12 do
+                        triggerPrompt(target)
+                        retries += 1
+                        task.wait(0.25)
+                    end
+
+                    state.cleaning = false
+                else
+                    setStatus("Scanning")
+                    task.wait(0.8)
+                end
+            end
+            task.wait(0.2)
+        end
+
+        state.cleaning = false
+        setStatus("Idle")
+    end)
+end
+
+local function stopCleaning()
+    state.autoCleaning = false
+    state.cleaning = false
+    setStatus("Idle")
+end
+
+local function bindButton(button, callback)
+    if button then
+        button.Activated:Connect(callback)
+        button.MouseButton1Click:Connect(callback)
+    end
+end
+
+local function setupInputCapture()
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if not state.recording then return end
 
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local guiPos = frame.AbsolutePosition
-            local guiSize = frame.AbsoluteSize
-            if input.Position and input.Position.X >= guiPos.X and input.Position.X <= (guiPos.X + guiSize.X) and
-               input.Position.Y >= guiPos.Y and input.Position.Y <= (guiPos.Y + guiSize.Y) then
+            local guiPos = state.lastGUI and state.lastGUI.AbsolutePosition or Vector2.new(0, 0)
+            local guiSize = state.lastGUI and state.lastGUI.AbsoluteSize or Vector2.new(0, 0)
+            if input.Position and input.Position.X >= guiPos.X and input.Position.X <= guiPos.X + guiSize.X and input.Position.Y >= guiPos.Y and input.Position.Y <= guiPos.Y + guiSize.Y then
                 return
             end
         end
 
-        if not recordStartTime then return end
-        local delayTime = tick() - recordStartTime
+        if not state.recordStart then return end
 
+        local delayTime = tick() - state.recordStart
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if input.Position then
-                local exactPos = Vector2.new(input.Position.X, input.Position.Y)
-                table.insert(recordedActions, {type = "tap", time = delayTime, pos = exactPos})
+                table.insert(state.recordedActions, { type = "tap", time = delayTime, pos = input.Position })
             end
         elseif input.UserInputType == Enum.UserInputType.Keyboard then
-            table.insert(recordedActions, {type = "key", time = delayTime, keyCode = input.KeyCode})
+            table.insert(state.recordedActions, { type = "key", time = delayTime, keyCode = input.KeyCode })
         end
     end)
+end
 
-    local function playMacro()
-        task.spawn(function()
-            local guiOffset = GuiService:GetGuiInset()
-            while _G.MacroPlaying do
-                if #recordedActions > 0 then
-                    for index, act in ipairs(recordedActions) do
-                        if not _G.MacroPlaying then break end
+local function buildUI()
+    local ui, _, _, buttons = makeGui()
+    state.lastGUI = ui:FindFirstChild("MainFrame")
 
-                        local waitTime = act.delay or 0
-                        if waitTime > 0 then
-                            statusLabel.Text = "Status: Waiting (" .. string.format("%.2f", waitTime) .. "s)"
-                            task.wait(waitTime)
-                        end
+    bindButton(buttons.record, function()
+        beginRecording()
+    end)
 
-                        if not _G.MacroPlaying then break end
+    bindButton(buttons.stopRecord, function()
+        stopRecording()
+    end)
 
-                        statusLabel.Text = "Status: Executing " .. index .. "/" .. #recordedActions
-                        if act.type == "tap" and act.pos then
-                            local clickX = act.pos.X
-                            local clickY = act.pos.Y + guiOffset.Y
-
-                            Vim:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                            task.wait(0.05)
-                            Vim:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
-                        elseif act.type == "key" and act.keyCode then
-                            Vim:SendKeyEvent(true, act.keyCode, false, game)
-                            task.wait(0.05)
-                            Vim:SendKeyEvent(false, act.keyCode, false, game)
-                        end
-                    end
-
-                    if _G.MacroPlaying and recordedEndDelay and recordedEndDelay > 0 then
-                        statusLabel.Text = "Status: Cycle Resting (" .. string.format("%.2f", recordedEndDelay) .. "s)"
-                        task.wait(recordedEndDelay)
-                    end
-                else
-                    clickGameButton("use")
-                    task.wait(0.3)
-                    clickGameButton("rep")
-                    task.wait(0.2)
-                end
-
-                task.wait(0.1)
-            end
-            isRunning = false
-            statusLabel.Text = "Status: Idle"
-        end)
-    end
-
-    local function isBlacklisted(str)
-        if not str then return false end
-        local lowerStr = string.lower(str)
-        for _, word in pairs(blacklist) do
-            if string.find(lowerStr, word) then return true end
-        end
-        return false
-    end
-
-    local function triggerTrashPrompt(prompt)
-        if not prompt then return end
-        if fireproximityprompt then
-            fireproximityprompt(prompt)
-        else
-            local key = prompt.KeyboardKeyCode or Enum.KeyCode.E
-            Vim:SendKeyEvent(true, key, false, game)
-            task.wait(0.05)
-            Vim:SendKeyEvent(false, key, false, game)
-        end
-    end
-
-    local function cleanObject(target)
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not hum or not target or not target.Parent then return end
-        
-        isCleaning = true
-        statusLabel.Text = "Status: Walking to target..."
-        
-        local targetPos = target:IsA("BasePart") and target.Position or (target.PrimaryPart and target.PrimaryPart.Position)
-        if not targetPos then
-            local part = target:FindFirstChildWhichIsA("BasePart", true)
-            if part then targetPos = part.Position end
-        end
-        
-        if targetPos then
-            hum:MoveTo(targetPos)
-            local reached = false
-            local conn = hum.MoveToFinished:Connect(function() reached = true end)
-            task.spawn(function() task.wait(3.5) reached = true end)
-            repeat task.wait(0.1) until reached or not target.Parent or not _G.AutoCleaning
-            if conn then conn:Disconnect() end
-        end
-        
-        if not _G.AutoCleaning then isCleaning = false return end
-        
-        statusLabel.Text = "Status: Cleaning..."
-        local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-        local attempts = 0
-        while target and target.Parent and _G.AutoCleaning and attempts < 12 do
-            if prompt then triggerTrashPrompt(prompt) end
-            attempts = attempts + 1
-            task.wait(0.25)
-        end
-        isCleaning = false
-    end
-
-    local function findNearestTrash()
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return nil end
-        local nearest, minDist = nil, 250
-        
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if (obj:IsA("BasePart") or obj:IsA("Model")) and not isBlacklisted(obj.Name) then
-                local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-                if prompt then
-                    local actionText = prompt.ActionText or ""
-                    local objectText = prompt.ObjectText or ""
-                    
-                    if not isBlacklisted(actionText) and not isBlacklisted(objectText) then
-                        local objName = string.lower(obj.Name)
-                        local isTrash = false
-                        
-                        for _, tName in pairs(trashNames) do
-                            if string.find(objName, tName) or string.find(string.lower(actionText), tName) or string.find(string.lower(objectText), tName) then
-                                isTrash = true
-                                break
-                            end
-                        end
-                        
-                        if isTrash then
-                            local pos = obj:IsA("BasePart") and obj.Position or (obj.PrimaryPart and obj.PrimaryPart.Position)
-                            if not pos then
-                                local p = obj:FindFirstChildWhichIsA("BasePart", true)
-                                if p then pos = p.Position end
-                            end
-                            if pos then
-                                local d = (root.Position - pos).Magnitude
-                                if d < minDist then minDist = d; nearest = obj end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        return nearest
-    end
-
-    local function startAutoCleaning()
-        task.spawn(function()
-            while _G.AutoCleaning do
-                if not isCleaning then
-                    local target = findNearestTrash()
-                    if target then cleanObject(target) 
-                    else 
-                        statusLabel.Text = "Status: Scanning..."
-                        task.wait(0.8) 
-                    end
-                end
-                task.wait(0.2)
-            end
-            statusLabel.Text = "Status: Idle"
-        end)
-    end
-
-    local function bindButton(btn, callback)
-        btn.Activated:Connect(callback)
-        btn.MouseButton1Click:Connect(callback)
-    end
-
-    bindButton(startButton, function()
-        if not isRunning and not _G.Recording and not _G.AutoCleaning then
-            _G.MacroPlaying = true
-            isRunning = true
-            statusLabel.Text = "Status: Playing Macro"
+    bindButton(buttons.play, function()
+        if not state.recording then
             playMacro()
         end
     end)
 
-    bindButton(stopButton, function()
-        _G.MacroPlaying = false
-        isRunning = false
-        _G.Recording = false
-        _G.AutoCleaning = false
-        isCleaning = false
-        recButton.Text = "REC"
-        statusLabel.Text = "Status: Idle"
+    bindButton(buttons.stopPlay, function()
+        stopMacro()
     end)
 
-    bindButton(recButton, function()
-        if not _G.Recording and not isRunning and not _G.AutoCleaning then
-            _G.MacroPlaying = false
-            recordedActions = {}
-            recordStartTime = tick()
-            recordedEndDelay = 0
-            _G.Recording = true
-            recButton.Text = "REC 🔴"
-            statusLabel.Text = "Status: Recording..."
+    bindButton(buttons.teleportTrash, function()
+        local t = findNearestByTerms(config.trashNames, 500)
+        if t then
+            teleportTo(t)
+            setStatus("Teleported to trash")
+        else
+            setStatus("No trash found")
         end
     end)
 
-    bindButton(stopRecButton, function()
-        if _G.Recording then
-            _G.Recording = false
-            recButton.Text = "REC"
-
-            if #recordedActions > 0 then
-                table.remove(recordedActions, #recordedActions)
-            end
-
-            local prevTime = 0
-            for i, act in ipairs(recordedActions) do
-                local t = act.time or 0
-                local delta = t - prevTime
-                if delta < 0 then delta = 0 end
-                act.delay = delta
-                prevTime = t
-            end
-
-            if recordStartTime then
-                local totalRecTime = tick() - recordStartTime
-                local lastActionTime = (recordedActions[#recordedActions] and recordedActions[#recordedActions].time) or 0
-                recordedEndDelay = math.max(0, totalRecTime - lastActionTime)
-            else
-                recordedEndDelay = 0
-            end
-
-            recordStartTime = nil
-
-            statusLabel.Text = "Status: Idle"
+    bindButton(buttons.teleportPuddle, function()
+        local t = findNearestByTerms(config.puddleNames, 500)
+        if t then
+            teleportTo(t)
+            setStatus("Teleported to puddle")
+        else
+            setStatus("No puddle found")
         end
     end)
 
-    bindButton(cleanButton, function()
-        if not _G.AutoCleaning and not _G.Recording and not isRunning then
-            _G.AutoCleaning = true
-            startAutoCleaning()
-            statusLabel.Text = "Status: AutoCleaning"
+    bindButton(buttons.clean, function()
+        if not state.autoCleaning then
+            cleanNearestByTerms(config.trashNames)
         end
     end)
 
-    bindButton(stopCleanButton, function()
-        _G.AutoCleaning = false
-        isCleaning = false
-        statusLabel.Text = "Status: Idle"
+    bindButton(buttons.stopClean, function()
+        stopCleaning()
     end)
+
+    return ui
 end
 
-if PlatoBoost.ValidateKey() then
-    startScript()
-else
-    PlatoBoost.PromptKey()
-end
+setupInputCapture()
+buildUI()
+
+setStatus("Ready")
+
+print("Powerlifters Farm script loaded")
+print("Add exact names to config.trashNames / config.puddleNames if needed")
+print("Example: config.trashNames = { 'trash', 'random trash', 'waste' }")
+print("Example: config.puddleNames = { 'puddle', 'mud', 'water' }")
