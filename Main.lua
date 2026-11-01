@@ -15,8 +15,9 @@ screenGui.Name = "vimtysscriptsGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 
+-- Головне вікно (збільшене по ширині для інструкції справа)
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 230, 0, 225)
+frame.Size = UDim2.new(0, 480, 0, 225)
 frame.Position = UDim2.new(0.05, 0, 0.3, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.Active = true
@@ -25,13 +26,13 @@ Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
 -- Верхня панель (Заголовок)
 local topBar = Instance.new("Frame", frame)
-topBar.Size = UDim2.new(0, 210, 0, 30)
+topBar.Size = UDim2.new(0, 460, 0, 30)
 topBar.Position = UDim2.new(0, 10, 0, 8)
 topBar.BackgroundTransparency = 1
 
 -- Чорний прямокутник для імені vimtysscripts
 local nameBg = Instance.new("Frame", topBar)
-nameBg.Size = UDim2.new(0, 160, 0, 30)
+nameBg.Size = UDim2.new(0, 410, 0, 30)
 nameBg.Position = UDim2.new(0, 0, 0, 0)
 nameBg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 Instance.new("UICorner", nameBg).CornerRadius = UDim.new(0, 6)
@@ -53,9 +54,9 @@ sunBtn.Text = "卍"
 sunBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 sunBtn.TextSize = 16
 sunBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", sunBtn).CornerRadius = UDim.new(1, 0) -- Робимо круглим
+Instance.new("UICorner", sunBtn).CornerRadius = UDim.new(1, 0)
 
--- Кнопки керування макросом
+-- Кнопки керування макросом (зліва)
 local function createButton(text, yPos, color)
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(0, 210, 0, 32)
@@ -83,24 +84,45 @@ statusLbl.TextSize = 11
 statusLbl.Font = Enum.Font.Gotham
 statusLbl.Text = "Status: Ready"
 
--- Логіка згортання/розгортання при натисканні на червоний круг з сонцем
+-- Інструкція справа
+local guideBg = Instance.new("Frame", frame)
+guideBg.Size = UDim2.new(0, 230, 0, 146)
+guideBg.Position = UDim2.new(0, 235, 0, 46)
+guideBg.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Instance.new("UICorner", guideBg).CornerRadius = UDim.new(0, 6)
+
+local guideLbl = Instance.new("TextLabel", guideBg)
+guideLbl.Size = UDim2.new(1, -10, 1, -10)
+guideLbl.Position = UDim2.new(0, 5, 0, 5)
+guideLbl.BackgroundTransparency = 1
+guideLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+guideLbl.TextSize = 11
+guideLbl.Font = Enum.Font.Gotham
+guideLbl.TextXAlignment = Enum.TextXAlignment.Left
+guideLbl.TextYAlignment = Enum.TextYAlignment.Top
+guideLbl.TextWrapped = true
+guideLbl.Text = "First take weight tap Record then click how many times u want. Then wait regen stamina and press stop. Thank You!"
+
+-- Логіка згортання/розгортання на знак сонця
 local isMinimized = false
 sunBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 230, 0, 46)
+        frame.Size = UDim2.new(0, 480, 0, 46)
         recBtn.Visible = false
         stopBtn.Visible = false
         playBtn.Visible = false
         loopBtn.Visible = false
         statusLbl.Visible = false
+        guideBg.Visible = false
     else
-        frame.Size = UDim2.new(0, 230, 0, 225)
+        frame.Size = UDim2.new(0, 480, 0, 225)
         recBtn.Visible = true
         stopBtn.Visible = true
         playBtn.Visible = true
         loopBtn.Visible = true
         statusLbl.Visible = true
+        guideBg.Visible = true
     end
 end)
 
@@ -121,7 +143,7 @@ recBtn.MouseButton1Click:Connect(function()
     statusLbl.Text = "Recording timeline..."
 end)
 
--- Зупинка запису та фіксація загального часу
+-- Зупинка запису та фіксація часу
 stopBtn.MouseButton1Click:Connect(function()
     if isRecording then
         isRecording = false
