@@ -9,7 +9,7 @@ local state = {
     recording = false,
     playing = false,
     actions = {},
-    recordStartedAt = 0,
+    startedAt = 0,
     gui = nil,
     statusLabel = nil,
 }
@@ -20,7 +20,7 @@ local function setStatus(text)
     end
 end
 
-local function isInsideGui(pos)
+local function insideGui(pos)
     if not state.gui then return false end
     local guiPos = state.gui.AbsolutePosition
     local guiSize = state.gui.AbsoluteSize
@@ -28,96 +28,150 @@ local function isInsideGui(pos)
         and pos.Y >= guiPos.Y and pos.Y <= guiPos.Y + guiSize.Y
 end
 
+local function findClosestVisibleButton(x, y, radius)
+    radius = radius or 120
+    local best = nil
+    local bestDist = radius
+
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            for _, obj in ipairs(gui:GetDescendants()) do
+                if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
+                    local pos = obj.AbsolutePosition
+                    local size = obj.AbsoluteSize
+                    local cx = pos.X + size.X / 2
+                    local cy = pos.Y + size.Y / 2
+                    local dist = math.sqrt((x - cx) ^ 2 + (y - cy) ^ 2)
+                    if dist < bestDist then
+                        bestDist = dist
+                        best = {
+                            x = cx,
+                            y = cy + GuiService:GetGuiInset().Y,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    return best
+end
+
+local function sendTap(x, y)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.035)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+end
+
+local function performAction(action)
+    if action.type == "tap" then
+        local x = action.x
+        local y = action.y
+
+        sendTap(x, y)
+
+        task.wait(0.04)
+
+        local fallback = findClosestVisibleButton(x, y, 90)
+        if fallback then
+            sendTap(fallback.x, fallback.y)
+        end
+    elseif action.type == "key" then
+        VirtualInputManager:SendKeyEvent(true, action.keyCode, false, game)
+        task.wait(0.03)
+        VirtualInputManager:SendKeyEvent(false, action.keyCode, false, game)
+    end
+end
+
 local function createGui()
-    if PlayerGui:FindFirstChild("PhoneMacroGui") then
-        PlayerGui.PhoneMacroGui:Destroy()
+    if PlayerGui:FindFirstChild("MacroExactGui") then
+        PlayerGui.MacroExactGui:Destroy()
     end
 
     local gui = Instance.new("ScreenGui")
-    gui.Name = "PhoneMacroGui"
+    gui.Name = "MacroExactGui"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.Parent = PlayerGui
 
     local frame = Instance.new("Frame")
-    frame.Name = "Main"
-    frame.Size = UDim2.new(0, 240, 0, 170)
-    frame.Position = UDim2.new(0.5, -120, 0.15, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    frame.Size = UDim2.new(0, 220, 0, 150)
+    frame.Position = UDim2.new(0.5, -110, 0.15, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     frame.BorderSizePixel = 0
     frame.Active = true
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
-    local title = Instance.new("TextLabel")
-    title.Parent = frame
-    title.Size = UDim2.new(1, -20, 0, 28)
-    title.Position = UDim2.new(0, 10, 0, 8)
-    title.BackgroundTransparency = 1
-    title.Text = "Macro"
-    title.TextColor3 = Color3.fromRGB(255,255,255)
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.Size = UDim2.new(1, -20, 0, 26)
+    label.Position = UDim2.new(0, 10, 0, 8)
+    label.BackgroundTransparency = 1
+    label.Text = "Exact Macro"
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
 
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Parent = frame
-    statusLabel.Size = UDim2.new(1, -20, 0, 20)
-    statusLabel.Position = UDim2.new(0, 10, 0, 38)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "Status: Idle"
-    statusLabel.TextColor3 = Color3.fromRGB(220,220,220)
-    statusLabel.Font = Enum.Font.SourceSans
-    statusLabel.TextSize = 13
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    local status = Instance.new("TextLabel")
+    status.Parent = frame
+    status.Size = UDim2.new(1, -20, 0, 20)
+    status.Position = UDim2.new(0, 10, 0, 36)
+    status.BackgroundTransparency = 1
+    status.Text = "Status: Idle"
+    status.TextColor3 = Color3.fromRGB(220, 220, 220)
+    status.Font = Enum.Font.SourceSans
+    status.TextSize = 13
+    status.TextXAlignment = Enum.TextXAlignment.Left
 
-    local recBtn = Instance.new("TextButton")
-    recBtn.Parent = frame
-    recBtn.Size = UDim2.new(0, 90, 0, 36)
-    recBtn.Position = UDim2.new(0, 10, 0, 70)
-    recBtn.Text = "REC"
-    recBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    recBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    recBtn.Font = Enum.Font.SourceSansBold
-    recBtn.TextSize = 15
-    Instance.new("UICorner", recBtn).CornerRadius = UDim.new(0, 8)
+    local rec = Instance.new("TextButton")
+    rec.Parent = frame
+    rec.Size = UDim2.new(0, 90, 0, 36)
+    rec.Position = UDim2.new(0, 10, 0, 70)
+    rec.Text = "REC"
+    rec.TextColor3 = Color3.fromRGB(255, 255, 255)
+    rec.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    rec.Font = Enum.Font.SourceSansBold
+    rec.TextSize = 15
+    Instance.new("UICorner", rec).CornerRadius = UDim.new(0, 8)
 
-    local playBtn = Instance.new("TextButton")
-    playBtn.Parent = frame
-    playBtn.Size = UDim2.new(0, 90, 0, 36)
-    playBtn.Position = UDim2.new(0, 120, 0, 70)
-    playBtn.Text = "PLAY"
-    playBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    playBtn.Font = Enum.Font.SourceSansBold
-    playBtn.TextSize = 15
-    Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0, 8)
+    local play = Instance.new("TextButton")
+    play.Parent = frame
+    play.Size = UDim2.new(0, 90, 0, 36)
+    play.Position = UDim2.new(0, 120, 0, 70)
+    play.Text = "PLAY"
+    play.TextColor3 = Color3.fromRGB(255, 255, 255)
+    play.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    play.Font = Enum.Font.SourceSansBold
+    play.TextSize = 15
+    Instance.new("UICorner", play).CornerRadius = UDim.new(0, 8)
 
-    local stopBtn = Instance.new("TextButton")
-    stopBtn.Parent = frame
-    stopBtn.Size = UDim2.new(1, -20, 0, 36)
-    stopBtn.Position = UDim2.new(0, 10, 0, 116)
-    stopBtn.Text = "STOP"
-    stopBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    stopBtn.BackgroundColor3 = Color3.fromRGB(100,100,100)
-    stopBtn.Font = Enum.Font.SourceSansBold
-    stopBtn.TextSize = 15
-    Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0, 8)
+    local stop = Instance.new("TextButton")
+    stop.Parent = frame
+    stop.Size = UDim2.new(1, -20, 0, 36)
+    stop.Position = UDim2.new(0, 10, 0, 110)
+    stop.Text = "STOP"
+    stop.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stop.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+    stop.Font = Enum.Font.SourceSansBold
+    stop.TextSize = 15
+    Instance.new("UICorner", stop).CornerRadius = UDim.new(0, 8)
 
     local function bind(button, callback)
         button.Activated:Connect(callback)
         button.MouseButton1Click:Connect(callback)
     end
 
-    bind(recBtn, function()
+    bind(rec, function()
         if state.recording or state.playing then return end
-        state.actions = {}
-        state.recordStartedAt = tick()
         state.recording = true
-        recBtn.Text = "REC •"
+        state.actions = {}
+        state.startedAt = tick()
+        rec.Text = "REC •"
         setStatus("Recording")
     end)
 
-    bind(playBtn, function()
+    bind(play, function()
         if state.recording or state.playing then return end
         if #state.actions == 0 then
             setStatus("No macro")
@@ -128,58 +182,46 @@ local function createGui()
         setStatus("Playing")
 
         task.spawn(function()
-            local previousTime = 0
+            local prevTime = 0
             for _, action in ipairs(state.actions) do
                 if not state.playing then break end
 
-                local waitTime = (action.time or 0) - previousTime
+                local waitTime = (action.time or 0) - prevTime
                 if waitTime > 0 then
                     task.wait(waitTime)
                 end
-                previousTime = action.time or 0
+                prevTime = action.time or 0
 
-                if action.type == "tap" then
-                    local x = action.x
-                    local y = action.y + GuiService:GetGuiInset().Y
-
-                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-                    task.wait(0.03)
-                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-                elseif action.type == "key" then
-                    VirtualInputManager:SendKeyEvent(true, action.keyCode, false, game)
-                    task.wait(0.03)
-                    VirtualInputManager:SendKeyEvent(false, action.keyCode, false, game)
-                end
+                performAction(action)
             end
 
             state.playing = false
-            recBtn.Text = "REC"
+            rec.Text = "REC"
             setStatus("Idle")
         end)
     end)
 
-    bind(stopBtn, function()
-        state.playing = false
+    bind(stop, function()
         state.recording = false
-        recBtn.Text = "REC"
+        state.playing = false
+        rec.Text = "REC"
         setStatus("Idle")
     end)
 
     state.gui = frame
-    state.statusLabel = statusLabel
-    return gui
+    state.statusLabel = status
 end
 
-local function recordInputAt(input)
+local function recordInput(input)
     if not state.recording then return end
-    local now = tick() - state.recordStartedAt
+    local now = tick() - state.startedAt
 
     if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton2 then
+        or input.UserInputType == Enum.UserInputType.MouseButton2
+        or input.UserInputType == Enum.UserInputType.Touch then
         if input.Position then
             local pos = input.Position
-            if isInsideGui(pos) then return end
+            if insideGui(pos) then return end
 
             table.insert(state.actions, {
                 type = "tap",
@@ -188,7 +230,6 @@ local function recordInputAt(input)
                 y = pos.Y,
             })
         end
-
     elseif input.UserInputType == Enum.UserInputType.Keyboard then
         table.insert(state.actions, {
             type = "key",
@@ -200,9 +241,9 @@ end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    recordInputAt(input)
+    recordInput(input)
 end)
 
 createGui()
 setStatus("Ready")
-print("Macro ready. Use REC -> do actions -> STOP -> PLAY")
+print("Exact macro ready. REC -> do actions -> STOP -> PLAY")
