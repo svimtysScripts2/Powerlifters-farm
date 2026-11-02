@@ -324,7 +324,7 @@ RedeemBtn.MouseButton1Click:Connect(function()
                 end)
             end
 
-playBtn.MouseButton1Click:Connect(function() playback(false) end)
+            playBtn.MouseButton1Click:Connect(function() playback(false) end)
             loopBtn.MouseButton1Click:Connect(function() playback(true) end)
 
         else
