@@ -61,13 +61,14 @@ local KeyInput = Instance.new("TextBox", keyFrame)
 KeyInput.Size = UDim2.new(0.9, 0, 0, 48)
 KeyInput.Position = UDim2.new(0.05, 0, 0.23, 0)
 KeyInput.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-KeyInput.Font = Enum.Font.Gotham
+KeyInput.Font = Enum.Font.GothamBold
 KeyInput.PlaceholderText = "Paste Key Here..."
 KeyInput.Text = ""
 KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 KeyInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
-KeyInput.TextSize = 13
+KeyInput.TextSize = 14
 KeyInput.ClearTextOnFocus = false
+KeyInput.TextXAlignment = Enum.TextXAlignment.Center
 Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 8)
 
 local inputStroke = Instance.new("UIStroke", KeyInput)
@@ -323,7 +324,7 @@ RedeemBtn.MouseButton1Click:Connect(function()
                 end)
             end
 
-            playBtn.MouseButton1Click:Connect(function() playback(false) end)
+playBtn.MouseButton1Click:Connect(function() playback(false) end)
             loopBtn.MouseButton1Click:Connect(function() playback(true) end)
 
         else
