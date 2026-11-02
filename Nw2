@@ -4,16 +4,8 @@ local playerGui = player:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
-local PUSL = loadstring(game:HttpGet("https://secure.pandauth.com/pv4/lib"))()
-if not PUSL or type(PUSL.configure) ~= "function" then
-    return warn("[Panda] Library failed to initialize.")
-end
-
-PUSL.configure({
-    serviceId = "svimtys",
-})
-
-local LootLabsURL = "https://loot-link.com/s?xRE8ygW2"
+local LuaProtectURL = "https://key.luaprotect.dev/0a10cc/003837"
+local LootLabsURL = "https://lootdest.org/s?2lqCgd7t"
 local DiscordURL = "https://discord.gg/6A8GMTbZm"
 
 local function verifyKey(key)
@@ -23,10 +15,18 @@ local function verifyKey(key)
         return true
     end
     
-    local result = PUSL.validate(key)
-    if result and result.success then
-        return true
+    -- Перевірка через API LuaProtect
+    local success, response = pcall(function()
+        return game:HttpGet("https://key.luaprotect.dev/api/v1/check?key=" .. key .. "&service=003837")
+    end)
+    
+    if success and response then
+        -- Якщо API повертає позитивний статус
+        if string.find(response, "true") or string.find(response, "valid") then
+            return true
+        end
     end
+    
     return false
 end
 
@@ -106,11 +106,12 @@ StatusLabel.Text = "Enter key to proceed"
 StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
 StatusLabel.TextSize = 12
 
+-- Кнопка Get Key тепер копіює твоє постійне посилання LuaProtect
 GetKeyBtn.MouseButton1Click:Connect(function()
-    local targetURL = (LootLabsURL ~= "") and LootLabsURL or DiscordURL
+    local targetURL = (LuaProtectURL ~= "") and LuaProtectURL or DiscordURL
     if setclipboard then
         setclipboard(targetURL)
-        StatusLabel.Text = "LootLabs link copied to clipboard!"
+        StatusLabel.Text = "LuaProtect link copied to clipboard!"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
     else
         StatusLabel.Text = "Link: " .. targetURL
