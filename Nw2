@@ -4,7 +4,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
-local LuaProtectURL = "https://key.luaprotect.dev/0a10cc/003837"
+local LuaProtectURL = "https://key.luaprotect.dev/0a10cc/576eb6" -- Виправлено ID потоку тут
 local DiscordURL = "https://discord.gg/6A8GMTbZm"
 
 local function verifyKey(key)
@@ -15,7 +15,7 @@ local function verifyKey(key)
     end
     
     local success, response = pcall(function()
-        return game:HttpGet("https://key.luaprotect.dev/api/v1/check?key=" .. key .. "&service=003837")
+        return game:HttpGet("https://key.luaprotect.dev/api/v1/check?key=" .. key .. "&service=576eb6") -- Виправлено ID потоку і тут
     end)
     
     if success and response then
@@ -61,13 +61,14 @@ local KeyInput = Instance.new("TextBox", keyFrame)
 KeyInput.Size = UDim2.new(0.9, 0, 0, 48)
 KeyInput.Position = UDim2.new(0.05, 0, 0.23, 0)
 KeyInput.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-KeyInput.Font = Enum.Font.Gotham
+KeyInput.Font = Enum.Font.GothamBold
 KeyInput.PlaceholderText = "Paste Key Here..."
 KeyInput.Text = ""
 KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 KeyInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
-KeyInput.TextSize = 13
+KeyInput.TextSize = 14
 KeyInput.ClearTextOnFocus = false
+KeyInput.TextXAlignment = Enum.TextXAlignment.Center
 Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 8)
 
 local inputStroke = Instance.new("UIStroke", KeyInput)
