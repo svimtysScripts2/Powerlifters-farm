@@ -16,12 +16,19 @@ local function verifyKey(key)
         return true
     end
     
+    local successHwid, hwid = pcall(function()
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+    end)
+    hwid = (successHwid and hwid) and hwid or "unknown"
+    
+    local url = string.format("https://key.luaprotect.dev/api/v1/check?key=%s&service=576eb6&hwid=%s", key, hwid)
+    
     local success, response = pcall(function()
-        return game:HttpGet("https://key.luaprotect.dev/api/v1/check?key=" .. key .. "&service=576eb6")
+        return game:HttpGet(url)
     end)
     
     if success and response then
-        if string.find(response, "true") or string.find(response, "valid") or string.find(response, "success") then
+        if string.find(response, '"valid":true') or string.find(response, '"success":true') or string.find(response, "true") then
             return true
         end
     end
