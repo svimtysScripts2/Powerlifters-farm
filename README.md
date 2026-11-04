@@ -21,8 +21,7 @@ local function verifyKey(key)
     end)
     hwid = (successHwid and hwid) and hwid or "unknown"
     
-    -- Updated query matching standard LuaProtect verification route
-    local url = string.format("https://api.luaprotect.dev/v1/check?stream=576eb6&key=%s&hwid=%s", key, hwid)
+    local url = string.format("https://key.luaprotect.dev/api/v1/ad-rewards/check?key=%s&stream=576eb6&hwid=%s", key, hwid)
     
     local success, response = pcall(function()
         return game:HttpGet(url)
@@ -271,75 +270,5 @@ RedeemBtn.MouseButton1Click:Connect(function()
                     statusLbl.Text = "Saved! Len: " .. string.format("%.2fs", totalDuration)
                 end
                 isPlaying = false
-            end)
-
-            UserInputService.InputBegan:Connect(function(input, gpe)
-                if isRecording and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                    local pos = input.Position
-                    local absPos = frame.AbsolutePosition
-                    local absSize = frame.AbsoluteSize
-                    if not (pos.X >= absPos.X and pos.X <= absPos.X + absSize.X and pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y) then
-                        local timePassed = tick() - recordingStartTime
-                        table.insert(recordedActions, {
-                            pos = Vector2.new(pos.X, pos.Y),
-                            timeFromStart = timePassed
-                        })
-                        statusLbl.Text = "Time: " .. string.format("%.2fs", timePassed)
-                    end
-                end
-            end)
-
-            local function playback(loop)
-                if isPlaying or #recordedActions == 0 then return end
-                isPlaying = true
-
-                task.spawn(function()
-                    repeat
-                        local playStartTime = tick()
-                        for _, action in ipairs(recordedActions) do
-                            if not isPlaying then break end
-                            local targetTime = playStartTime + action.timeFromStart
-                            while tick() < targetTime do
-                                if not isPlaying then break end
-                                RunService.Heartbeat:Wait()
-                            end
-                            if not isPlaying then break end
-                            statusLbl.Text = "Playing: " .. string.format("%.2fs", action.timeFromStart)
-                            
-                            pcall(function()
-                                for _, guiObj in ipairs(playerGui:GetDescendants()) do
-                                    if guiObj:IsA("GuiButton") and guiObj.Visible then
-                                        local absPos = guiObj.AbsolutePosition
-                                        local absSize = guiObj.AbsoluteSize
-                                        if action.pos.X >= absPos.X and action.pos.X <= absPos.X + absSize.X and
-                                           action.pos.Y >= absPos.Y and action.pos.Y <= absPos.Y + absSize.Y then
-                                            for _, conn in ipairs(getconnections(guiObj.MouseButton1Click)) do
-                                                conn:Fire()
-                                            end
-                                        end
-                                    end
-                                end
-                            end)
-                        end
-                        if isPlaying and totalDuration > 0 then
-                            local stopTargetTime = playStartTime + totalDuration
-                            while tick() < stopTargetTime do
-                                if not isPlaying then break end
-                                RunService.Heartbeat:Wait()
-                            end
-                        end
-                    until not isPlaying or not loop
-                    isPlaying = false
-                    statusLbl.Text = "Status: Finished"
-                end)
             end
-
-            playBtn.MouseButton1Click:Connect(function() playback(false) end)
-            loopBtn.MouseButton1Click:Connect(function() playback(true) end)
-
-        else
-            StatusLabel.Text = "Invalid or expired key!"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
-        end
-    end)
-end)
+            
