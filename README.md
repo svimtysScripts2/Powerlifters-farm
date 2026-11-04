@@ -27,8 +27,16 @@ local function verifyKey(key)
         return game:HttpGet(url)
     end)
     
+    -- Check server response in console (F9)
+    print("[LuaProtect Response]:", tostring(response))
+    
     if success and response then
-        if string.find(response, '"valid":true') or string.find(response, '"success":true') or string.find(response, "true") then
+        local lowerResp = string.lower(response)
+        if string.find(lowerResp, '"valid":true') 
+            or string.find(lowerResp, '"success":true') 
+            or string.find(lowerResp, '"status":"valid"')
+            or string.find(lowerResp, '"status":"success"')
+            or string.find(lowerResp, "true") then
             return true
         end
     end
