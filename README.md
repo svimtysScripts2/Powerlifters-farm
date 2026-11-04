@@ -21,13 +21,13 @@ local function verifyKey(key)
     end)
     hwid = (successHwid and hwid) and hwid or "unknown"
     
-    local url = string.format("https://key.luaprotect.dev/api/v1/ad-rewards/check?key=%s&stream=576eb6&hwid=%s", key, hwid)
+    -- Виправлено з &stream= на &link= відповідно до налаштувань Ad Rewards
+    local url = string.format("https://key.luaprotect.dev/api/v1/ad-rewards/check?key=%s&link=576eb6&hwid=%s", key, hwid)
     
     local success, response = pcall(function()
         return game:HttpGet(url)
     end)
     
-    -- Check server response in console (F9)
     print("[LuaProtect Response]:", tostring(response))
     
     if success and response then
