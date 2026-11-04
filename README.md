@@ -21,7 +21,8 @@ local function verifyKey(key)
     end)
     hwid = (successHwid and hwid) and hwid or "unknown"
     
-    local url = string.format("https://key.luaprotect.dev/api/v1/check?key=%s&service=576eb6&hwid=%s", key, hwid)
+    -- Updated query matching standard LuaProtect verification route
+    local url = string.format("https://api.luaprotect.dev/v1/check?stream=576eb6&key=%s&hwid=%s", key, hwid)
     
     local success, response = pcall(function()
         return game:HttpGet(url)
