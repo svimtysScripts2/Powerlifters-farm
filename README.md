@@ -21,14 +21,18 @@ local function verifyKey(key)
     end)
     hwid = (successHwid and hwid) and hwid or "unknown"
     
-    -- Виправлено з &stream= на &link= відповідно до налаштувань Ad Rewards
     local url = string.format("https://key.luaprotect.dev/api/v1/ad-rewards/check?key=%s&link=576eb6&hwid=%s", key, hwid)
+    
+    print("[LuaProtect Debug] Generated URL:", url)
+    print("[LuaProtect Debug] Input Key:", key)
+    print("[LuaProtect Debug] HWID:", hwid)
     
     local success, response = pcall(function()
         return game:HttpGet(url)
     end)
     
-    print("[LuaProtect Response]:", tostring(response))
+    print("[LuaProtect Debug] HttpGet Success Status:", tostring(success))
+    print("[LuaProtect Debug] Server Raw Response:", tostring(response))
     
     if success and response then
         local lowerResp = string.lower(response)
