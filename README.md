@@ -233,7 +233,6 @@ local function saveKeyTime()
     end)
 end
 
--- Якщо ключ вже вводився менше 12 годин тому — одразу відкриваємо макрос без кей-системи!
 if hasValidSavedKey() then
     loadMacroUI()
 else
@@ -302,7 +301,7 @@ else
     GetKeyBtn.Font = Enum.Font.GothamBold
     GetKeyBtn.Text = "Get Key"
     GetKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    GetKeyBtn.TextSize, GetKeyBtn.TextSize = 14, 14
+    GetKeyBtn.TextSize = 14
     Instance.new("UICorner", GetKeyBtn).CornerRadius = UDim.new(0, 8)
 
     local StatusLabel = Instance.new("TextLabel", keyFrame)
@@ -339,8 +338,8 @@ else
             end
 
             if isValid then
-                saveKeyTime() -- Зберігаємо час активації на 12 годин
-                StatusLabel.Text = "Success! Loading macro..."
+                saveKeyTime() -- Запускаємо відлік таймера на 12 годин
+                StatusLabel.Text = "12 hours left"
                 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
                 task.wait(1)
                 keyScreenGui:Destroy()
